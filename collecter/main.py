@@ -1,7 +1,7 @@
 # -- coding: utf-8 --
 
-import psutil,time,requests,json
-
+import psutil,time,requests,json,subprocess
+import configparser
 
 class Collecter(object):
 
@@ -101,11 +101,43 @@ class Collecter(object):
             all_inter_info[i] = per_net_info
         return json.dumps(all_inter_info)
 
+    def Get_Extend_Info(self, key, value):
+        '''获取自定义脚本数据'''
+        value = subprocess.Popen(value.strip("'"), shell=True, stdout=subprocess.PIPE,stderr=subprocess.STDOUT).stdout.read().decode('utf8').strip('\r\n')
+        return value
 
 if __name__ == "__main__":
-    # psutil.cpu_percent(interval=10)
-    collec = Collecter()
-    collec.Get_Net_Info()
+    '''初始化相关信息'''
+    collect = Collecter()
+    conf = configparser.ConfigParser()
+    conf.read('monitor.conf', 'utf8')
+    poll_time = conf.get('collect', 'poll_time')
+    extend_status = conf.get('collect', 'extend_status')
+    server_url = conf.get('server', 'url')
+    server_port = conf.get('server', 'port')
+    server_perfix = '/insert_info'
+    server_apikey = conf.get('server', 'apikey')
+
+    while True:
+        all_info = {}
+        '''获取扩展脚本信息'''
+        if extend_status == 'True':
+            for k,v in conf.items('extend'):
+                all_info[k] = collect.Get_Extend_Info(k,v)
+
+        all_info['cpus'] = collect.Get_Cpu_Info()
+        all_info['mems'] = collect.Get_Mem_Info()
+        all_info['disks_space'] = collect.Get_Disk_Space_Info()
+        all_info['disks_io'] = collect.Get_Disk_IO_Info()
+        all_info['nets'] = collect.Get_Net_Info()
+
+        '''提交数据到服务端'''
+        # requests.post(server_url,data=all_info)
+
+        print(all_info)
+        time.sleep(int(poll_time))
+
+
 
 
 
